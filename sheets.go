@@ -123,6 +123,12 @@ func readSheet() {
 				e.DesiredRoles = append(e.DesiredRoles, om.LicenseClass)
 			}
 
+			isVE, veRoles := isVE(cs)
+
+			if isVE {
+				e.DesiredRoles = append(e.DesiredRoles, veRoles...)
+
+			}
 			roster[did] = e
 
 		}

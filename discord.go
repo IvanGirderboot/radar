@@ -148,7 +148,7 @@ func enforceMemberships(s *discordgo.Session) {
 					}
 				}
 				if hasRole == true {
-					fmt.Printf("In Guild \"%s\" User \"%s\" already has role \"%s\" (Skipping Add)\n", g.Name, ros.Member.User.Username, rn)
+					//fmt.Printf("In Guild \"%s\" User \"%s\" already has role \"%s\" (Skipping Add)\n", g.Name, ros.Member.User.Username, rn)
 				} else {
 					fmt.Printf("In Guild \"%s\" User \"%s\" added to role \"%s\"\n", g.Name, ros.Member.User.Username, rn)
 					err := s.GuildMemberRoleAdd(g.ID, id, rm[rn])

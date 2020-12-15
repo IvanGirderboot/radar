@@ -14,17 +14,29 @@ import (
 
 // Variables used for command line parameters
 var (
-	Token       string
-	Spreadsheet string
+	Token        string
+	Spreadsheet  string
+	GLAARGSource string
+	roster       = make(map[string]Roster)
+	rostLock     sync.RWMutex
+
+	guildRoleMap = make(map[*discordgo.Guild]map[string]string)
+	grmLock      sync.RWMutex
 )
 
-var guildRoleMap = make(map[*discordgo.Guild]map[string]string)
-var grmLock sync.RWMutex
+// Roster represents a discord user tied to their membership data, including desired roles.
+type Roster struct {
+	Callsign     string
+	DesiredRoles []string
+	Member       *discordgo.Member
+	OM           *HamOperator
+}
 
 func init() {
 
 	flag.StringVar(&Token, "t", "", "Bot Token")
 	flag.StringVar(&Spreadsheet, "s", "", "Google Spreadsheet ID")
+	flag.StringVar(&GLAARGSource, "g", "", "GLAARG VE Data Source")
 	flag.Parse()
 
 	if Token == "" {
@@ -37,17 +49,6 @@ func init() {
 	}
 
 }
-
-// Roster represents a discord user tied to their membership data, including desired roles.
-type Roster struct {
-	Callsign     string
-	DesiredRoles []string
-	Member       *discordgo.Member
-	OM           *HamOperator
-}
-
-var roster = make(map[string]Roster)
-var rostLock sync.RWMutex
 
 func main() {
 
