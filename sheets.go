@@ -69,7 +69,7 @@ func saveToken(path string, token *oauth2.Token) {
 	json.NewEncoder(f).Encode(token)
 }
 
-func readSheet() {
+func readSheet(c chan bool) {
 	b, err := ioutil.ReadFile("credentials.json")
 	if err != nil {
 		log.Fatalf("Unable to read client secret file: %v", err)
@@ -98,9 +98,7 @@ func readSheet() {
 	if len(resp.Values) == 0 {
 		fmt.Println("No data found.")
 	} else {
-		fmt.Println("Name, Call, Discord ID:")
-		rostLock.Lock()
-		defer rostLock.Unlock()
+		//fmt.Println("Name, Call, Discord ID:")
 		for _, row := range resp.Values {
 			// Print columns A and E, which correspond to indices 0 and 4.
 			name := fmt.Sprintf("%v", row[3])
@@ -113,13 +111,17 @@ func readSheet() {
 				continue
 			}
 
+			//fmt.Println("Locking rostlock")
+			rostLock.RLock()
+			//fmt.Println("Read Lock acquired")
 			e := roster[did]
+			rostLock.RUnlock()
 			e.Callsign = cs
 			e.DesiredRoles = append(e.DesiredRoles, "Club Member")
 
 			om, err := callsignLookup(cs)
 			if err == nil && om.LicenseStatus == "Active" {
-				//fmt.Printf("Adding class based role %s for %s\n", om.LicenseClass, om.Callsign)
+				fmt.Printf("Adding class based role %s for %s\n", om.LicenseClass, om.Callsign)
 				e.DesiredRoles = append(e.DesiredRoles, om.LicenseClass)
 			}
 
@@ -129,8 +131,10 @@ func readSheet() {
 				e.DesiredRoles = append(e.DesiredRoles, veRoles...)
 
 			}
+			rostLock.Lock()
 			roster[did] = e
-
+			rostLock.Unlock()
 		}
 	}
+	c <- true
 }

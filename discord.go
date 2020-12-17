@@ -79,17 +79,20 @@ func mapMembers(s *discordgo.Session, g *discordgo.Guild) {
 		fmt.Printf("Error reading guild members for %s: %s", g.Name, err)
 	}
 
-	rostLock.Lock()
-	defer rostLock.Unlock()
 	for _, m := range mem {
 		/*if m.Nick != "" {
 			fmt.Printf("Member %s (%s) [%s] has Roles %v\n", m.User.Username, m.Nick, m.User.ID, m.Roles)
 		} else {
 			fmt.Printf("Member %s [%s] has Roles %v \n", m.User.Username, m.User.ID, m.Roles)
 		} */
+		rostLock.Lock()
 		e := roster[m.User.ID]
+		if e == nil {
+			e = new(Roster)
+		}
 		e.Member = m
 		roster[m.User.ID] = e
+		rostLock.Unlock()
 	}
 }
 
@@ -121,6 +124,7 @@ func findRoleID(rn string, g *discordgo.Guild) (string, error) {
 	return "", fmt.Errorf("Role %s not found on Guild %s", rn, g.Name)
 }
 
+// mapRoles populates the guild role map  with all roles in the guild.
 func mapRoles(g *discordgo.Guild) {
 	grmLock.Lock()
 	defer grmLock.Unlock()
@@ -157,6 +161,8 @@ func enforceMemberships(s *discordgo.Session) {
 					}
 				}
 			}
+			// Clear desired roles now that we've applied them
+			roster[id].DesiredRoles = nil
 		}
 	}
 }
