@@ -17,20 +17,13 @@ var (
 	Token        string
 	Spreadsheet  string
 	GLAARGSource string
-	roster       = make(map[string]*Roster)
-	rostLock     sync.RWMutex
 
+	//roster
 	guildRoleMap = make(map[*discordgo.Guild]map[string]string)
 	grmLock      sync.RWMutex
 )
 
 // Roster represents a discord user tied to their membership data, including desired roles.
-type Roster struct {
-	Callsign     string
-	DesiredRoles []string
-	Member       *discordgo.Member
-	OM           *HamOperator
-}
 
 func init() {
 
@@ -58,6 +51,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	r := newRoster()
+	//	grm := newGuildRoleMap()
+
 	// Let Bot connect first
 	time.Sleep(5 * time.Second)
 	//enforceMemberships(dg)
@@ -79,26 +75,26 @@ func main() {
 		case t := <-ticker.C:
 			fmt.Println("Beginning refresh cycle at ", t)
 			sheetsRead := make(chan bool)
-			go readSheet(sheetsRead)
+			go readSheet(r, sheetsRead)
 
 			discordMapped := make(chan bool)
-			go updateDiscordMaps(dg, discordMapped)
+			go updateDiscordMaps(dg, discordMapped, r)
 
 			<-sheetsRead
-			fmt.Println("Sheets have been Read")
+			fmt.Println("Sheets have been read")
 			<-discordMapped
 			fmt.Println("Discord Mapped")
-			enforceMemberships(dg)
+			enforceMemberships(dg, r)
 		}
 	}
 }
 
-func updateDiscordMaps(s *discordgo.Session, c chan bool) {
+func updateDiscordMaps(s *discordgo.Session, c chan bool, r *roster) {
 	grmLock.RLock()
 	for g := range guildRoleMap {
 		grmLock.RUnlock()
 		mapRoles(g)
-		mapMembers(s, g)
+		mapMembers(s, g, r)
 		grmLock.RLock()
 	}
 	grmLock.RUnlock()

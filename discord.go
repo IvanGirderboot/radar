@@ -73,7 +73,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 }
 
-func mapMembers(s *discordgo.Session, g *discordgo.Guild) {
+func mapMembers(s *discordgo.Session, g *discordgo.Guild, r *roster) {
 	mem, err := s.GuildMembers(g.ID, "", 1000)
 	if err != nil {
 		fmt.Printf("Error reading guild members for %s: %s", g.Name, err)
@@ -85,14 +85,14 @@ func mapMembers(s *discordgo.Session, g *discordgo.Guild) {
 		} else {
 			fmt.Printf("Member %s [%s] has Roles %v \n", m.User.Username, m.User.ID, m.Roles)
 		} */
-		rostLock.Lock()
-		e := roster[m.User.ID]
-		if e == nil {
-			e = new(Roster)
-		}
+		//rostLock.Lock()
+		e := r.getEntry(m.User.ID)
+		//	if e == nil {
+		//		e = new(Roster)
+		//}
 		e.Member = m
-		roster[m.User.ID] = e
-		rostLock.Unlock()
+		//roster[m.User.ID] = e
+		//rostLock.Unlock()
 	}
 }
 
@@ -106,9 +106,10 @@ func guildCreate(s *discordgo.Session, event *discordgo.GuildCreate) {
 	grmLock.Lock()
 	guildRoleMap[event.Guild] = make(map[string]string)
 	grmLock.Unlock()
+
 	fmt.Printf("Joined server %s (ID: %s).\n", event.Guild.Name, event.Guild.ID)
 	fmt.Printf("Currently connected to %d servers.\n", len(guildRoleMap))
-	mapMembers(s, event.Guild)
+	//mapMembers(s, event.Guild)
 	mapRoles(event.Guild)
 
 	//fmt.Printf("GuildMap: %v", guildRoleMap)
@@ -134,13 +135,13 @@ func mapRoles(g *discordgo.Guild) {
 	}
 }
 
-func enforceMemberships(s *discordgo.Session) {
+func enforceMemberships(s *discordgo.Session, r *roster) {
 	// For each guild...
 	for g, rm := range guildRoleMap {
-		rostLock.RLock()
-		defer rostLock.RUnlock()
+		r.Lock.RLock()
+		defer r.Lock.RUnlock()
 		// Look at each roster entry...
-		for id, ros := range roster {
+		for id, ros := range r.Map {
 			// And process each desired role...
 			for _, rn := range ros.DesiredRoles {
 				hasRole := false
@@ -162,7 +163,7 @@ func enforceMemberships(s *discordgo.Session) {
 				}
 			}
 			// Clear desired roles now that we've applied them
-			roster[id].DesiredRoles = nil
+			r.Map[id].DesiredRoles = nil
 		}
 	}
 }
