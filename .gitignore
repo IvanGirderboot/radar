@@ -1,2 +1,4 @@
 *.json
 *.exe
+run.*
+radar

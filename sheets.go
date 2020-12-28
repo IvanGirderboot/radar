@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
+	"strings"
+
+	"github.com/apex/log"
 
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
@@ -76,7 +78,7 @@ func readSheet(r *roster, c chan bool) {
 	}
 
 	// If modifying these scopes, delete your previously saved token.json.
-	config, err := google.ConfigFromJSON(b, "https://www.googleapis.com/auth/spreadsheets.readonly")
+	config, err := google.ConfigFromJSON(b, "https://www.googleapis.com/auth/spreadsheets")
 	if err != nil {
 		log.Fatalf("Unable to parse client secret file to config: %v", err)
 	}
@@ -96,40 +98,63 @@ func readSheet(r *roster, c chan bool) {
 	}
 
 	if len(resp.Values) == 0 {
-		fmt.Println("No data found.")
+		log.WithFields(log.Fields{
+			"Routine":     "Google Sheets",
+			"Sheet ID":    spreadsheetID,
+			"Sheet Range": readRange,
+		}).Error("No sheet data found.")
 	} else {
-		//fmt.Println("Name, Call, Discord ID:")
-		for _, row := range resp.Values {
+		for offset, row := range resp.Values {
 			// Print columns A and E, which correspond to indices 0 and 4.
 			name := fmt.Sprintf("%v", row[3])
 			cs := fmt.Sprintf("%v", row[5])
 			did := fmt.Sprintf("%v", row[0])
-			//fmt.Printf("%s, %s, %s\n", did, cs, name)
+			dun := fmt.Sprintf("%v", row[1])
+			dnn := fmt.Sprintf("%v", row[2])
 
 			if did == "" {
-				fmt.Printf("No Discord ID for %s, (%s), skipping any updates.\n", cs, name)
+				log.WithFields(log.Fields{
+					"Callsign": cs,
+					"Name":     name,
+				}).Warnf("No Discord ID in Google sheet for %s (%s), skipping record.", cs, name)
 				continue
 			}
 
 			e := r.getEntry(did)
 			e.Callsign = cs
-			e.DesiredRoles = append(e.DesiredRoles, "Club Member")
+			_, found := Find(e.DesiredRoles, "Club Member")
 
-			om, err := callsignLookup(cs)
-			if err == nil && om.LicenseStatus == "Active" {
-				fmt.Printf("Adding license class based role %s for %s\n", om.LicenseClass, om.Callsign)
-				e.DesiredRoles = append(e.DesiredRoles, om.LicenseClass)
+			if !found {
+				e.DesiredRoles = append(e.DesiredRoles, "Club Member")
 			}
 
-			isVE, veRoles := isVE(cs)
-
-			if isVE {
-				e.DesiredRoles = append(e.DesiredRoles, veRoles...)
-
+			nicknames := strings.Join(e.Nicknames, ", ")
+			// If there is no discord data to write to the Sheet, move on
+			if (e.Username == "" || e.Username == dun) && (len(e.Nicknames) == 0 || nicknames == dnn) {
+				continue
 			}
-			//rostLock.Lock()
-			//roster[did] = e
-			//rostLock.Unlock()
+
+			// Determine row to update
+			editRange := fmt.Sprintf("[Club Member]!B%d:C", offset+2)
+
+			var vr sheets.ValueRange
+
+			editData := []interface{}{
+				fmt.Sprintf("%s#%s", e.Username, e.Discriminator),
+				nicknames}
+
+			vr.Values = append(vr.Values, editData)
+
+			_, err := srv.Spreadsheets.Values.Update(spreadsheetID, editRange, &vr).ValueInputOption("RAW").Do()
+			if err != nil {
+				log.WithFields(log.Fields{
+					"Routine":     "Google Sheets",
+					"Sheet ID":    spreadsheetID,
+					"Sheet Range": editRange,
+					"Values":      vr.Values,
+					"Error":       err,
+				}).Error("Error updating Google Sheet.")
+			}
 		}
 	}
 	c <- true

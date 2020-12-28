@@ -2,10 +2,11 @@ package main
 
 import (
 	"encoding/csv"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/apex/log"
 )
 
 var (
@@ -46,10 +47,13 @@ func isGLAARGVE(cs string) bool {
 
 // loadGLAARG loads the GLAARG VE database into memory as there is no per-user lookup right now
 func loadGLAARGData() {
-	fmt.Printf("Loading GLAARG VEC Data...\n")
+	log.Info("Loading GLAARG VEC Data...")
 	resp, err := http.Get(GLAARGSource)
 	if err != nil {
-		fmt.Printf("Error loading GLAARG Data: %v\n", err)
+		log.WithFields(log.Fields{
+			"Routine": "VE Database",
+			"Error":   err,
+		}).Error("Error loading GLAARG Data")
 	}
 
 	defer resp.Body.Close()
@@ -60,11 +64,39 @@ func loadGLAARGData() {
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			fmt.Printf("Error processing a VE Record, skipping.\n")
+			log.WithFields(log.Fields{
+				"Routine": "VE Database",
+				"Error":   err,
+			}).Info("Error processing a VE Record, skipping.")
 			continue
 		}
 		//fmt.Printf("GLAARG VE Loaded with %v fields loaded: %v \n", len(data), data)
 		glaargData[strings.ToUpper(data[2])] = data
 	}
-	fmt.Printf("Loaded %d records from the GLAARG VEC datastore.\n", len(glaargData))
+	log.WithFields(log.Fields{
+		"Routine":        "VE Database",
+		"Records Loaded": len(glaargData),
+	}).Info("Loaded the GLAARG VEC datastore.")
+}
+
+// veLookup checks each rosterEntry in a roster and applies the VE role(s) as required.
+func veLookup(r *roster, complete chan bool) {
+	for _, re := range r.Map {
+		if re.Callsign == "" {
+			continue
+		}
+
+		isVE, veRoles := isVE(re.Callsign)
+
+		if isVE {
+			//	re.DesiredRoles = append(re.DesiredRoles, veRoles...)
+			for _, role := range veRoles {
+				_, found := Find(re.DesiredRoles, role)
+				if !found {
+					re.DesiredRoles = append(re.DesiredRoles, role)
+				}
+			}
+		}
+	}
+	complete <- true
 }
