@@ -77,7 +77,7 @@ func (re *rosterEntry) addDiscordInfo(m *discordgo.Member, g *discordgo.Guild) {
 		"Nicknames":     re.Nicknames,
 		"Username":      re.Username,
 		"Discriminator": re.Discriminator,
-	}).Info("Updated roster entry")
+	}).Debug("Updated roster entry")
 }
 
 func init() {
@@ -149,20 +149,20 @@ func Find(slice []string, val string) (int, bool) {
 func dispatchHandler(dg *discordgo.Session) {
 
 	r := newRoster()
-	apply := make(chan bool)
-	init := make(chan bool, 1)
+	apply := make(chan string)
+	init := make(chan string, 1)
 
 	sheetTicker := time.NewTicker(16 * time.Minute)
 	veTicker := time.NewTicker(1 * time.Hour)
 	csTicker := time.NewTicker(3 * time.Hour)
 	veDbTicker := time.NewTicker(13 * time.Hour)
 
-	init <- true
+	init <- "Startup"
 
 	for {
 		select {
 		case <-init: // Startup or when /radar refresh is called
-			log.Info("Beginning full initilaztion cycle.")
+			log.Info("Beginning full initialization cycle.")
 			go readSheet(r, init)
 			<-init
 			go rosterCallsignLookup(r, init)
@@ -181,8 +181,10 @@ func dispatchHandler(dg *discordgo.Session) {
 		case <-csTicker.C:
 			log.Info("Beginning Callsign Lookup refresh cycle.")
 			go rosterCallsignLookup(r, apply)
-		case <-apply:
-			log.Info("Beginning Discord role enforcement.")
+		case reason := <-apply:
+			log.WithFields(log.Fields{
+				"Reason": reason,
+			}).Info("Beginning Discord role enforcement.")
 			go enforceMemberships(dg, r)
 		}
 	}

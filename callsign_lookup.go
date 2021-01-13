@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -47,24 +46,30 @@ func callsignLookup(cs string) (*HamOperator, error) {
 
 // rosterCallsignLookup performs a callsign lookup on each roster entry
 //   and assigns the correct class-based role.
-func rosterCallsignLookup(r *roster, complete chan bool) {
+func rosterCallsignLookup(r *roster, complete chan string) {
 	for _, re := range r.Map {
 		if re.Callsign == "" {
 			continue
 		}
 		log.WithFields(log.Fields{
-			"routine": "Callsign Lookups",
-		}).Debug(fmt.Sprintf("Looking up data for %v", re.Callsign))
+			"Routine":  "Callsign Lookups",
+			"Callsign": re.Callsign,
+		}).Debug("Looking up callsign data")
 		om, err := callsignLookup(re.Callsign)
 		if err != nil {
 			log.WithFields(log.Fields{
-				"routine": "Callsign Lookups",
-			}).Error(fmt.Sprintf("Error looking up data for %v: %v", re.Callsign, err))
+				"Routine":  "Callsign Lookups",
+				"Error":    err,
+				"Callsign": re.Callsign,
+			}).Error("Error looking up callsign data.")
 			continue
 		}
 		log.WithFields(log.Fields{
-			"routine": "Callsign Lookups",
-		}).Debug(fmt.Sprintf("%v has a %v class license with a %v status.", re.Callsign, om.LicenseClass, om.LicenseStatus))
+			"routine":        "Callsign Lookups",
+			"Callsign":       re.Callsign,
+			"License Class":  om.LicenseClass,
+			"License Status": om.LicenseClass,
+		}).Debug("License lookup successful.")
 
 		if om.LicenseStatus == "Active" {
 			var removeRoles []string
@@ -77,16 +82,20 @@ func rosterCallsignLookup(r *roster, complete chan bool) {
 				removeRoles = []string{"Technician", "General"}
 			default:
 				log.WithFields(log.Fields{
-					"routine": "Callsign Lookups",
-				}).Warn(fmt.Sprintf("Unknown licence class %s for %s", om.LicenseClass, om.Callsign))
+					"Routine":       "Callsign Lookups",
+					"Callsign":      om.Callsign,
+					"License Class": om.LicenseClass,
+				}).Warn("Unknown licence class")
 			}
 
 			// Add the correct class, if needed
 			_, found := Find(re.DesiredRoles, om.LicenseClass)
 			if !found {
 				log.WithFields(log.Fields{
-					"routine": "Callsign Lookups",
-				}).Info(fmt.Sprintf("Adding license class role %s for %s\n", om.LicenseClass, om.Callsign))
+					"Routine":  "Callsign Lookups",
+					"Callsign": om.Callsign,
+					"Role":     om.LicenseClass,
+				}).Info("Marking license class role for addition")
 				re.DesiredRoles = append(re.DesiredRoles, om.LicenseClass)
 			}
 
@@ -95,12 +104,14 @@ func rosterCallsignLookup(r *roster, complete chan bool) {
 				_, found := Find(re.UndesiredRoles, role)
 				if !found {
 					log.WithFields(log.Fields{
-						"routine": "Callsign Lookups",
-					}).Info(fmt.Sprintf("Removing license class role %s for %s\n", role, om.Callsign))
+						"Routine":  "Callsign Lookups",
+						"Callsign": om.Callsign,
+						"Role":     role,
+					}).Info("Marking license class role for removal.")
 					re.UndesiredRoles = append(re.UndesiredRoles, role)
 				}
 			}
 		}
 	}
-	complete <- true
+	complete <- "Callsign lookups complete"
 }

@@ -80,7 +80,7 @@ func loadGLAARGData() {
 }
 
 // veLookup checks each rosterEntry in a roster and applies the VE role(s) as required.
-func veLookup(r *roster, complete chan bool) {
+func veLookup(r *roster, complete chan string) {
 	for _, re := range r.Map {
 		if re.Callsign == "" {
 			continue
@@ -98,5 +98,5 @@ func veLookup(r *roster, complete chan bool) {
 			}
 		}
 	}
-	complete <- true
+	complete <- "VE lookups complete."
 }

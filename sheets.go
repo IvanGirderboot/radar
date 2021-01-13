@@ -71,7 +71,7 @@ func saveToken(path string, token *oauth2.Token) {
 	json.NewEncoder(f).Encode(token)
 }
 
-func readSheet(r *roster, c chan bool) {
+func readSheet(r *roster, c chan string) {
 	b, err := ioutil.ReadFile("credentials.json")
 	if err != nil {
 		log.Fatalf("Unable to read client secret file: %v", err)
@@ -91,7 +91,7 @@ func readSheet(r *roster, c chan bool) {
 
 	// HRV Roster
 	spreadsheetID := Spreadsheet
-	readRange := "[Club Member]!A2:I"
+	readRange := "[Club Member]!A2:K"
 	resp, err := srv.Spreadsheets.Values.Get(spreadsheetID, readRange).Do()
 	if err != nil {
 		log.Fatalf("Unable to retrieve data from sheet: %v", err)
@@ -111,7 +111,10 @@ func readSheet(r *roster, c chan bool) {
 			did := fmt.Sprintf("%v", row[0])
 			dun := fmt.Sprintf("%v", row[1])
 			dnn := fmt.Sprintf("%v", row[2])
-
+			var extraRoles []string
+			if len(row) >= 11 {
+				extraRoles = strings.Split(fmt.Sprintf("%v", row[10]), ",")
+			}
 			if did == "" {
 				log.WithFields(log.Fields{
 					"Callsign": cs,
@@ -126,6 +129,16 @@ func readSheet(r *roster, c chan bool) {
 
 			if !found {
 				e.DesiredRoles = append(e.DesiredRoles, "Club Member")
+			}
+
+			// Add each extra role, if needed.
+			for i := range extraRoles {
+				role := strings.TrimSpace(extraRoles[i])
+				_, found := Find(e.DesiredRoles, role)
+
+				if !found {
+					e.DesiredRoles = append(e.DesiredRoles, role)
+				}
 			}
 
 			nicknames := strings.Join(e.Nicknames, ", ")
@@ -157,5 +170,5 @@ func readSheet(r *roster, c chan bool) {
 			}
 		}
 	}
-	c <- true
+	c <- "Google Sheet processing complete."
 }

@@ -138,7 +138,7 @@ func enforceMemberships(s *discordgo.Session, r *roster) {
 			log.WithFields(log.Fields{
 				"Routine":  "Discord Role Membership",
 				"Function": "enforceMemberships",
-			}).Trace(fmt.Sprintf("User %v has Roles %v", member.User.Username, member.Roles))
+			}).Debug(fmt.Sprintf("User %v has Roles %v", member.User.Username, member.Roles))
 
 			// And process each desired role...
 			log.WithFields(log.Fields{
@@ -148,14 +148,20 @@ func enforceMemberships(s *discordgo.Session, r *roster) {
 				_, found := Find(member.Roles, roleMap[roleName])
 				// Add the role if we DON'T have it.
 				if !found {
-					log.WithFields(log.Fields{
-						"Guild": guild.Name,
-						"User":  member.User.Username,
-						"Role":  roleName,
-					}).Info("Added role to member.")
 					err := s.GuildMemberRoleAdd(guild.ID, member.User.ID, roleMap[roleName])
 					if err != nil {
-						log.Error(fmt.Sprintf("Error adding user to role: %v\n", err))
+						log.WithFields(log.Fields{
+							"Guild": guild.Name,
+							"User":  member.User.Username,
+							"Role":  roleName,
+							"Error": err,
+						}).Error("Error adding member to role.")
+					} else {
+						log.WithFields(log.Fields{
+							"Guild": guild.Name,
+							"User":  member.User.Username,
+							"Role":  roleName,
+						}).Info("Added role to member.")
 					}
 					rolesAdded++
 				}
@@ -169,14 +175,20 @@ func enforceMemberships(s *discordgo.Session, r *roster) {
 				_, found := Find(member.Roles, roleMap[roleName])
 				// Remove the role if we DO have it.
 				if found {
-					log.WithFields(log.Fields{
-						"Guild": guild.Name,
-						"User":  member.User.Username,
-						"Role":  roleName,
-					}).Info("Removed role from member.")
 					err := s.GuildMemberRoleRemove(guild.ID, member.User.ID, roleMap[roleName])
 					if err != nil {
-						log.Errorf("Error removing user from role: %v\n", err)
+						log.WithFields(log.Fields{
+							"Guild": guild.Name,
+							"User":  member.User.Username,
+							"Role":  roleName,
+							"Error": err,
+						}).Error("Error removing user from role.")
+					} else {
+						log.WithFields(log.Fields{
+							"Guild": guild.Name,
+							"User":  member.User.Username,
+							"Role":  roleName,
+						}).Info("Removed role from member.")
 					}
 					rolesRemoved++
 				}
