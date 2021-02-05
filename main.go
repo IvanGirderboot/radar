@@ -166,7 +166,6 @@ func dispatchHandler(dg *discordgo.Session) {
 			go readSheet(r, init)
 			<-init
 			go rosterCallsignLookup(r, init)
-			loadGLAARGData()
 			go veLookup(r, apply)
 			<-init
 		case <-sheetTicker.C:
@@ -176,8 +175,8 @@ func dispatchHandler(dg *discordgo.Session) {
 			log.Info("Beginning VE Lookup refresh cycle.")
 			go veLookup(r, apply)
 		case <-veDbTicker.C:
-			log.Info("Beginning VE Database refresh cycle.")
-			go loadGLAARGData()
+			//log.Info("Beginning VE Database refresh cycle.")
+			//go loadGLAARGData()
 		case <-csTicker.C:
 			log.Info("Beginning Callsign Lookup refresh cycle.")
 			go rosterCallsignLookup(r, apply)

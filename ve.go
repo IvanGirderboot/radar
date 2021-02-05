@@ -1,16 +1,9 @@
 package main
 
 import (
-	"encoding/csv"
-	"io"
-	"net/http"
 	"strings"
 
 	"github.com/apex/log"
-)
-
-var (
-	glaargData = make(map[string][]string)
 )
 
 // getVEStatus checks a callsign for status with each queriable
@@ -34,49 +27,39 @@ func isVE(cs string) (isVE bool, roles []string) {
 	return isVE, roles
 }
 
-// isGLAARGVE checks for an active registration with GLAARG-VEC
-func isGLAARGVE(cs string) bool {
-	if len(glaargData) < 1 {
-		loadGLAARGData()
-	}
-	if _, ok := glaargData[cs]; ok {
-		return true
-	}
-	return false
+// GLAARGVE represents a GLAARG VE
+type GLAARGVE struct {
+	Callsign   string `json:"veCallSign"`
+	Active     string `json:"veAccreditationActive"`
+	ReturnCode string `json:"type"`
 }
 
-// loadGLAARG loads the GLAARG VE database into memory as there is no per-user lookup right now
-func loadGLAARGData() {
-	log.Info("Loading GLAARG VEC Data...")
-	resp, err := http.Get(GLAARGSource)
+// isGLAARGVE checks for an active registration with GLAARG-VEC
+func isGLAARGVE(cs string) bool {
+	dbSvr := "http://glaarglookup.n1cck.com:5000/ve?veCallSign="
+
+	url := dbSvr + cs
+
+	ve := new(GLAARGVE)
+	err := getJSON(url, ve)
 	if err != nil {
 		log.WithFields(log.Fields{
-			"Routine": "VE Database",
-			"Error":   err,
-		}).Error("Error loading GLAARG Data")
+			"Routine":  "GLAARG VE Lookup",
+			"Error":    err,
+			"Callsign": cs,
+		}).Error("Error looking up GLAARG VE Record.")
+		return false
 	}
-
-	defer resp.Body.Close()
-	reader := csv.NewReader(resp.Body)
-	//reader.Comma = ';'
-	for {
-		data, err := reader.Read()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			log.WithFields(log.Fields{
-				"Routine": "VE Database",
-				"Error":   err,
-			}).Info("Error processing a VE Record, skipping.")
-			continue
-		}
-		//fmt.Printf("GLAARG VE Loaded with %v fields loaded: %v \n", len(data), data)
-		glaargData[strings.ToUpper(data[2])] = data
+	if ve.Active == "Y" {
+		return true
 	}
-	log.WithFields(log.Fields{
-		"Routine":        "VE Database",
-		"Records Loaded": len(glaargData),
-	}).Info("Loaded the GLAARG VEC datastore.")
+	if ve.ReturnCode == "404" {
+		log.WithFields(log.Fields{
+			"Routine":  "GLAARG VE Lookup",
+			"Callsign": cs,
+		}).Debug("Callsign not found in GLAARG VE Database")
+	}
+	return false
 }
 
 // veLookup checks each rosterEntry in a roster and applies the VE role(s) as required.
